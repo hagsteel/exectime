@@ -41,7 +41,8 @@ fn main() {
 
     loop {
         match rx.try_recv() {
-            Ok(_) => exit(0),
+            Ok(Status::Ok) => exit(0),
+            Ok(Status::Failed) => exit(1),
             Err(err) => {
                 if let mpsc::TryRecvError::Disconnected = err {
                     // There is nothing we can do here
@@ -71,11 +72,17 @@ fn run_command(command: String, args: Vec<String>, tmux_win_id: String, tx: mpsc
         .output();
 
     match cmd {
-        Ok(_) => {
+        Ok(status) => {
             let elapsed = now.elapsed();
             let seconds = elapsed.as_secs();
             let _ = tx.send(Status::Ok);
-            rename_tmux_window(&format!("Ok ({})", seconds), &tmux_win_id);
+            match status.status.code() {
+                Some(0) => rename_tmux_window(&format!("Ok ({})", seconds), &tmux_win_id),
+                _ => {
+                    let _ = tx.send(Status::Failed); 
+                    rename_tmux_window("Err", &tmux_win_id);
+                }
+            }
         }
         Err(_) => { 
             let _ = tx.send(Status::Failed); 
