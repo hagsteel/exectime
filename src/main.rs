@@ -1,6 +1,6 @@
 use std::time::{Instant, Duration};
 use std::env::{args, var};
-use std::process::Command;
+use std::process::{Command, exit};
 use std::thread;
 use std::sync::mpsc;
 
@@ -14,14 +14,17 @@ fn main() {
         Ok(id) => id,
         Err(_) => {
             eprintln!("TMX_WINID is not set");
-            return
+            exit(1);
         }
     };
 
     let mut all_args = args().into_iter().skip(1).collect::<Vec<_>>();
     let execute = match all_args.first() {
         Some(a) => a.to_string(),
-        None => return,
+        None => {
+            eprintln!("No args supplied");
+            exit(1);
+        }
     };
 
     all_args.remove(0);
@@ -38,16 +41,11 @@ fn main() {
 
     loop {
         match rx.try_recv() {
-            Ok(Status::Ok) => {
-                return
-            }
-            Ok(Status::Failed) => {
-                return
-            }
+            Ok(_) => exit(0),
             Err(err) => {
                 if let mpsc::TryRecvError::Disconnected = err {
                     // There is nothing we can do here
-                    return;
+                    exit(1);
                 }
                 let seconds = now.elapsed().as_secs_f32();
                 rename_tmux_window(&format!("Building ({:.2})", seconds), &tmux_win_id);
